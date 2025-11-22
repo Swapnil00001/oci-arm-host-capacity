@@ -7,10 +7,16 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'tests/**'
+      - 'src/**'
+      - 'composer.json'
 
 jobs:
   run-tests:
     runs-on: ubuntu-latest
+    # Only run tests when test/src files change, not on every push
+    if: github.event_name == 'push'
     strategy:
       matrix:
         php-versions: ['8.3']
@@ -51,7 +57,9 @@ jobs:
 
   create-instance:
     runs-on: ubuntu-latest
+    # Run provisioning on schedule/manual, OR after tests pass on push
     needs: run-tests
+    if: always() && (github.event_name != 'push' || needs.run-tests.result == 'success')
     strategy:
       matrix:
         php-versions: ['8.3']
