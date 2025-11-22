@@ -18,6 +18,20 @@ $envFilename = empty($argv[1]) ? '.env' : $argv[1];
 $dotenv = Dotenv::createUnsafeImmutable(__DIR__, $envFilename);
 $dotenv->safeLoad();
 
+// Check for Telegram commands
+$telegram = new \Hitrov\Notification\Telegram();
+if ($telegram->isSupported()) {
+    try {
+        $command = $telegram->getLatestCommand();
+        if ($command === '/report') {
+            echo "Received /report command. Generating report...\n";
+            require_once __DIR__ . '/report.php';
+        }
+    } catch (\Exception $e) {
+        echo "Error checking Telegram commands: " . $e->getMessage() . "\n";
+    }
+}
+
 /*
  * No need to modify any value in this file anymore!
  * Copy .env.example to .env and adjust there instead.

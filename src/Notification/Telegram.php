@@ -46,4 +46,62 @@ class Telegram implements NotifierInterface
     {
         return !empty(getenv('TELEGRAM_BOT_API_KEY')) && !empty(getenv('TELEGRAM_USER_ID'));
     }
+
+    public function getLatestCommand(int $seconds = 360): ?string
+    {
+        $apiKey = getenv('TELEGRAM_BOT_API_KEY');
+        $telegramUserId = getenv('TELEGRAM_USER_ID');
+        
+        if (!$this->isSupported()) {
+            return null;
+        }
+
+        $url = "https://api.telegram.org/bot$apiKey/getUpdates";
+        
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        $response = curl_exec($ch);
+        curl_close($ch);
+        
+        if (!$response) {
+            return null;
+        }
+        
+        $data = json_decode($response, true);
+        if (!isset($data['ok']) || !$data['ok'] || empty($data['result'])) {
+            return null;
+        }
+        
+        // Check updates from newest to oldest
+        $updates = array_reverse($data['result']);
+        $cutoff = time() - $seconds;
+        
+        foreach ($updates as $update) {
+            if (!isset($update['message']['text'])) {
+                continue;
+            }
+            
+            $message = $update['message'];
+            
+            // Check if message is from authorized user
+            if ((string)$message['from']['id'] !== (string)$telegramUserId) {
+                continue;
+            }
+            
+            // Check timestamp (ignore old messages)
+            if ($message['date'] < $cutoff) {
+                continue;
+            }
+            
+            $text = trim($message['text']);
+            // Check for commands (starting with / or \)
+            if (strpos($text, '/') === 0 || strpos($text, '\\') === 0) {
+                return str_replace('\\', '/', $text);
+            }
+        }
+        
+        return null;
+    }
 }
