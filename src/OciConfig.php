@@ -79,7 +79,7 @@ class OciConfig implements \JsonSerializable
      */
     public function getSourceDetails(): string
     {
-        if (isset($this->sourceDetails)) {
+        if (!empty($this->sourceDetails)) {
             return $this->sourceDetails;
         }
 
