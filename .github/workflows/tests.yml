@@ -89,8 +89,19 @@ jobs:
           ls -lh oracle_key.pem
 
       - name: Run Provisioning Script
+        id: provision
         run: |
-          php index.php
+          OUTPUT=$(php index.php 2>&1)
+          echo "$OUTPUT"
+          echo "$OUTPUT" > provision_output.txt
+          
+          # Check if instance was created successfully
+          if echo "$OUTPUT" | grep -q '"id":'; then
+            echo "SUCCESS=true" >> $GITHUB_OUTPUT
+            echo "$OUTPUT" > instance_data.json
+          else
+            echo "SUCCESS=false" >> $GITHUB_OUTPUT
+          fi
         env:
           OCI_REGION: ${{ secrets.OCI_REGION }}
           OCI_USER_ID: ${{ secrets.OCI_USER_ID }}
@@ -108,3 +119,13 @@ jobs:
           # Optional: Telegram notifications
           TELEGRAM_USER_ID: ${{ secrets.TELEGRAM_USER_ID }}
           TELEGRAM_BOT_API_KEY: ${{ secrets.TELEGRAM_BOT_API_KEY }}
+
+      - name: Send Success Notification
+        if: steps.provision.outputs.SUCCESS == 'true'
+        run: |
+          INSTANCE_DATA=$(cat instance_data.json)
+          export INSTANCE_DATA
+          php notify-success.php
+        env:
+          TELEGRAM_BOT_API_KEY: ${{ secrets.TELEGRAM_BOT_API_KEY }}
+          TELEGRAM_USER_ID: ${{ secrets.TELEGRAM_USER_ID }}

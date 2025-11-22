@@ -1,0 +1,88 @@
+name: Daily Provisioning Report
+
+on:
+  schedule:
+    # Run at 9 AM UTC every day
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+
+jobs:
+  send-daily-report:
+    runs-on: ubuntu-latest
+    name: Send Daily Summary
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Install PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          
+      - name: Install dependencies
+        run: |
+          composer install --prefer-dist --no-progress
+
+      - name: Generate and Send Daily Report
+        run: |
+          php -r "
+          \$apiKey = getenv('TELEGRAM_BOT_API_KEY');
+          \$userId = getenv('TELEGRAM_USER_ID');
+          
+          if (empty(\$apiKey) || empty(\$userId)) {
+              echo 'Telegram credentials not configured. Skipping report.';
+              exit(0);
+          }
+          
+          // Get workflow runs from the last 24 hours
+          \$repo = getenv('GITHUB_REPOSITORY');
+          \$token = getenv('GITHUB_TOKEN');
+          \$yesterday = date('c', strtotime('-24 hours'));
+          
+          \$ch = curl_init();
+          curl_setopt(\$ch, CURLOPT_URL, \"https://api.github.com/repos/{\$repo}/actions/workflows/tests.yml/runs?created=>{\$yesterday}\");
+          curl_setopt(\$ch, CURLOPT_RETURNTRANSFER, true);
+          curl_setopt(\$ch, CURLOPT_HTTPHEADER, [
+              'Authorization: Bearer ' . \$token,
+              'Accept: application/vnd.github.v3+json',
+              'User-Agent: PHP'
+          ]);
+          \$response = curl_exec(\$ch);
+          curl_close(\$ch);
+          
+          \$data = json_decode(\$response, true);
+          \$totalRuns = \$data['total_count'] ?? 0;
+          
+          // Calculate attempts (roughly every 5 minutes = 288 attempts per day max)
+          \$estimatedAttempts = min(\$totalRuns, 288);
+          
+          \$message = \"📊 *Daily Oracle Cloud Provisioning Report*\n\n\";
+          \$message .= \"📅 Date: \" . date('Y-m-d') . \"\n\";
+          \$message .= \"🔄 Total Attempts: ~{\$estimatedAttempts}\n\";
+          \$message .= \"⏱️ Running every 5 minutes\n\n\";
+          \$message .= \"Status: Still trying to get Ampere A1 instance...\n\";
+          \$message .= \"💪 Keep going! Capacity will open up eventually.\n\n\";
+          \$message .= \"ℹ️ You'll get a separate notification when instance is created.\";
+          
+          // Send to Telegram
+          \$telegramUrl = \"https://api.telegram.org/bot{\$apiKey}/sendMessage\";
+          \$postData = [
+              'chat_id' => \$userId,
+              'text' => \$message,
+              'parse_mode' => 'Markdown'
+          ];
+          
+          \$ch = curl_init();
+          curl_setopt(\$ch, CURLOPT_URL, \$telegramUrl);
+          curl_setopt(\$ch, CURLOPT_POST, true);
+          curl_setopt(\$ch, CURLOPT_POSTFIELDS, http_build_query(\$postData));
+          curl_setopt(\$ch, CURLOPT_RETURNTRANSFER, true);
+          \$result = curl_exec(\$ch);
+          curl_close(\$ch);
+          
+          echo 'Daily report sent to Telegram';
+          "
+        env:
+          TELEGRAM_BOT_API_KEY: ${{ secrets.TELEGRAM_BOT_API_KEY }}
+          TELEGRAM_USER_ID: ${{ secrets.TELEGRAM_USER_ID }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
