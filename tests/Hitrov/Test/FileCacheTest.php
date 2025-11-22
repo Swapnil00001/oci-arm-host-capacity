@@ -9,7 +9,6 @@ use PHPUnit\Framework\TestCase;
 
 class FileCacheTest extends TestCase
 {
-    const CONFIG_MD5 = '0c4b5682ece1704df5bf11d71fa55177';
     const ENV_FILENAME = '.env.test';
 
     use DefaultConfig, LoadEnv;
@@ -41,8 +40,10 @@ class FileCacheTest extends TestCase
         $config = $this->getDefaultConfig();
         $cache = new FileCache($config);
 
+        $expectedKey = md5(json_encode($config));
+
         $this->assertEquals(
-            self::CONFIG_MD5,
+            $expectedKey,
             $cache->getCacheKey('foo'),
         );
     }
@@ -66,9 +67,10 @@ class FileCacheTest extends TestCase
 
         $cache->add([1, 'one'], 'foo');
 
+        $expectedKey = md5(json_encode($config));
         $expected = [
             "foo" => [
-                "0c4b5682ece1704df5bf11d71fa55177" => [
+                $expectedKey => [
                     1,
                     "one"
                 ]
@@ -86,9 +88,10 @@ class FileCacheTest extends TestCase
         $config = $this->getDefaultConfig();
         $cache = new FileCache($config);
 
+        $expectedKey = md5(json_encode($config));
         $existingCache = json_encode([
             "foo" => [
-                "0c4b5682ece1704df5bf11d71fa55177" => [
+                $expectedKey => [
                     1,
                     "one"
                 ]
@@ -101,13 +104,13 @@ class FileCacheTest extends TestCase
 
         $expected = [
             "foo" => [
-                "0c4b5682ece1704df5bf11d71fa55177" => [
+                $expectedKey => [
                     1,
                     "one"
                 ]
             ],
             "bar" => [
-                "0c4b5682ece1704df5bf11d71fa55177" => [
+                $expectedKey => [
                     2,
                     "two"
                 ]
@@ -123,12 +126,16 @@ class FileCacheTest extends TestCase
     public function testUpdatesWithDifferentConfig()
     {
         $config = $this->getDefaultConfig();
+        $firstConfigKey = md5(json_encode($config));
+        
         $config->bootVolumeId = 'baz';
+        $secondConfigKey = md5(json_encode($config));
+        
         $cache = new FileCache($config);
 
         $existingCache = json_encode([
             "foo" => [
-                "0c4b5682ece1704df5bf11d71fa55177" => [
+                $firstConfigKey => [
                     1,
                     "one"
                 ]
@@ -141,11 +148,11 @@ class FileCacheTest extends TestCase
 
         $expected = [
             "foo" => [
-                "0c4b5682ece1704df5bf11d71fa55177" => [
+                $firstConfigKey => [
                     1,
                     "one"
                 ],
-                "b11f9e5fbe425f149a45af5a9fb40d66" => [
+                $secondConfigKey => [
                     11,
                     "eleven"
                 ]
