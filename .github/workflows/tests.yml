@@ -27,6 +27,11 @@ jobs:
         run: |
           composer install --prefer-dist --no-progress
 
+      - name: Create test private key
+        run: |
+          openssl genrsa -out /tmp/test_key.pem 2048
+          chmod 600 /tmp/test_key.pem
+
       - name: Create Private Key File
         run: |
           echo "${{ secrets.OCI_PRIVATE_KEY_BASE64 }}" | base64 --decode > oracle_key.pem
@@ -39,7 +44,7 @@ jobs:
           OCI_USER_ID: ${{ secrets.OCI_USER_ID }}
           OCI_TENANCY_ID: ${{ secrets.OCI_TENANCY_ID }}
           OCI_KEY_FINGERPRINT: ${{ secrets.OCI_KEY_FINGERPRINT }}
-          OCI_PRIVATE_KEY_FILENAME: "oracle_key.pem"
+          OCI_PRIVATE_KEY_FILENAME: "/tmp/test_key.pem"
           OCI_SUBNET_ID: ${{ secrets.OCI_SUBNET_ID }}
           OCI_IMAGE_ID: "ocid1.image.oc1.ap-mumbai-1.aaaaaaaaohman5szirc6pao66iw4xiyi7wrknar66xmy7t3hf7yxx7eoplqa"
           OCI_OCPUS: 4

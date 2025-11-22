@@ -20,6 +20,17 @@ class FileCacheTest extends TestCase
 
         $this->loadEnv();
 
+        // Create test private key if it doesn't exist
+        $keyPath = '/tmp/test_key.pem';
+        if (!file_exists($keyPath)) {
+            $privateKey = openssl_pkey_new([
+                'private_key_bits' => 2048,
+                'private_key_type' => OPENSSL_KEYTYPE_RSA,
+            ]);
+            openssl_pkey_export_to_file($privateKey, $keyPath);
+            chmod($keyPath, 0600);
+        }
+
         if (file_exists($this->getCacheFilename())) {
             unlink($this->getCacheFilename());
         }
