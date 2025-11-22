@@ -70,7 +70,9 @@ jobs:
 
       - name: Create Private Key File
         run: |
-          echo "${{ secrets.OCI_PRIVATE_KEY_BASE64 }}" | base64 --decode > oracle_key.pem
+          cat << 'EOF' > oracle_key.pem
+          ${{ secrets.OCI_PRIVATE_KEY }}
+          EOF
           chmod 600 oracle_key.pem
           # Verify key file was created and contains valid PEM format
           if [ ! -s oracle_key.pem ]; then
@@ -79,7 +81,8 @@ jobs:
           fi
           if ! head -1 oracle_key.pem | grep -q "BEGIN"; then
             echo "Error: Private key file doesn't contain valid PEM format"
-            cat oracle_key.pem | head -5
+            echo "First line of file:"
+            head -1 oracle_key.pem
             exit 1
           fi
           echo "Private key file created successfully"
