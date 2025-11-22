@@ -9,12 +9,12 @@ on:
       - main
 
 jobs:
-  create-instance:
+  run-tests:
     runs-on: ubuntu-latest
     strategy:
       matrix:
         php-versions: ['8.3']
-    name: Attempt Provisioning
+    name: Run Unit Tests
     steps:
       - uses: actions/checkout@v3
       
@@ -32,11 +32,7 @@ jobs:
           openssl genrsa -out /tmp/test_key.pem 2048
           chmod 600 /tmp/test_key.pem
 
-      - name: Create Private Key File
-        run: |
-          echo "${{ secrets.OCI_PRIVATE_KEY_BASE64 }}" | base64 --decode > oracle_key.pem
-
-      - name: Run Provisioning Script
+      - name: Run Unit Tests
         run: |
           vendor/bin/phpunit --color tests/
         env:
@@ -47,10 +43,54 @@ jobs:
           OCI_PRIVATE_KEY_FILENAME: "/tmp/test_key.pem"
           OCI_SUBNET_ID: ${{ secrets.OCI_SUBNET_ID }}
           OCI_IMAGE_ID: "ocid1.image.oc1.ap-mumbai-1.aaaaaaaaohman5szirc6pao66iw4xiyi7wrknar66xmy7t3hf7yxx7eoplqa"
+          OCI_AVAILABILITY_DOMAIN: ${{ secrets.OCI_AVAILABILITY_DOMAIN }}
           OCI_OCPUS: 4
           OCI_MEMORY_IN_GBS: 24
           OCI_SHAPE: "VM.Standard.A1.Flex"
           OCI_SSH_PUBLIC_KEY: ${{ secrets.OCI_SSH_PUBLIC_KEY }}
-          # Optional: Telegram notifications if you added those secrets
+
+  create-instance:
+    runs-on: ubuntu-latest
+    needs: run-tests
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    strategy:
+      matrix:
+        php-versions: ['8.3']
+    name: Attempt Provisioning
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Install PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php-versions }}
+          
+      - name: Install dependencies
+        run: |
+          composer install --prefer-dist --no-progress
+
+      - name: Create Private Key File
+        run: |
+          echo "${{ secrets.OCI_PRIVATE_KEY_BASE64 }}" | base64 --decode > oracle_key.pem
+          chmod 600 oracle_key.pem
+
+      - name: Run Provisioning Script
+        run: |
+          php index.php
+        env:
+          OCI_REGION: ${{ secrets.OCI_REGION }}
+          OCI_USER_ID: ${{ secrets.OCI_USER_ID }}
+          OCI_TENANCY_ID: ${{ secrets.OCI_TENANCY_ID }}
+          OCI_KEY_FINGERPRINT: ${{ secrets.OCI_KEY_FINGERPRINT }}
+          OCI_PRIVATE_KEY_FILENAME: "oracle_key.pem"
+          OCI_SUBNET_ID: ${{ secrets.OCI_SUBNET_ID }}
+          OCI_IMAGE_ID: "ocid1.image.oc1.ap-mumbai-1.aaaaaaaaohman5szirc6pao66iw4xiyi7wrknar66xmy7t3hf7yxx7eoplqa"
+          OCI_AVAILABILITY_DOMAIN: ${{ secrets.OCI_AVAILABILITY_DOMAIN }}
+          OCI_OCPUS: 4
+          OCI_MEMORY_IN_GBS: 24
+          OCI_SHAPE: "VM.Standard.A1.Flex"
+          OCI_SSH_PUBLIC_KEY: ${{ secrets.OCI_SSH_PUBLIC_KEY }}
+          OCI_MAX_INSTANCES: 1
+          # Optional: Telegram notifications
           TELEGRAM_USER_ID: ${{ secrets.TELEGRAM_USER_ID }}
           TELEGRAM_BOT_API_KEY: ${{ secrets.TELEGRAM_BOT_API_KEY }}
